@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forbes Telegram | Top 100</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: #0a0c0f;
+            color: #fff;
+            line-height: 1.5;
+            padding: 30px 20px;
+            background-image: radial-gradient(circle at 10% 20%, rgba(255, 215, 0, 0.03) 0%, transparent 30%),
+                              radial-gradient(circle at 90% 80%, rgba(255, 215, 0, 0.03) 0%, transparent 30%);
+        }
+
+        .access-denied {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 80vh;
+            text-align: center;
+            font-size: 1.2rem;
+            color: #8b949e;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: clamp(2.2rem, 6vw, 3.8rem);
+            font-weight: 900;
+            text-transform: uppercase;
+            background: linear-gradient(145deg, #ffd700, #ffaa00);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        .header h1 span {
+            background: #ffd700;
+            color: #0a0c0f;
+            padding: 0 12px;
+            border-radius: 100px;
+            font-size: 1.5rem;
+            margin-left: 10px;
+            display: inline-block;
+        }
+
+        .subhead {
+            color: #b9c2d0;
+            font-size: 1.2rem;
+            border-bottom: 3px solid #ffd700;
+            display: inline-block;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .lang-selector {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .lang-selector button {
+            background: #1e2530;
+            border: 1px solid #2f3742;
+            color: #b9c2d0;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 0 4px;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .lang-selector button.active,
+        .lang-selector button:hover {
+            background: #ffd700;
+            color: #0a0c0f;
+            border-color: #ffd700;
+        }
+
+        .promo {
+            background: rgba(255, 215, 0, 0.05);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 60px;
+            padding: 15px 25px;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+            backdrop-filter: blur(8px);
+        }
+
+        .promo-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #f0e6d0;
+        }
+
+        .promo-text strong {
+            color: #ffd700;
+            font-weight: 800;
+        }
+
+        .promo-stars {
+            background: #1e2530;
+            padding: 8px 20px;
+            border-radius: 40px;
+            border: 1px solid #ffd700;
+            color: #ffd700;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 30px 0 20px;
+            font-size: 1rem;
+            background: #1a212b;
+            padding: 12px 25px;
+            border-radius: 60px;
+            border: 1px solid #2f3742;
+        }
+
+        .stats span {
+            color: #b9c2d0;
+        }
+
+        .stats span span {
+            color: #ffd700;
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin-left: 5px;
+        }
+
+        .rank-table {
+            background: #14181f;
+            border-radius: 32px;
+            overflow: hidden;
+            border: 1px solid #2a323e;
+            margin-bottom: 40px;
+            box-shadow: 0 25px 40px -15px black;
+        }
+
+        .rank-header {
+            display: grid;
+            grid-template-columns: 60px 2fr 2fr 1.2fr;
+            padding: 15px 20px;
+            background: #1e2530;
+            font-weight: 700;
+            color: #8b949e;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #2f3742;
+        }
+
+        .rank-row {
+            display: grid;
+            grid-template-columns: 60px 2fr 2fr 1.2fr;
+            padding: 12px 20px;
+            align-items: center;
+            border-bottom: 1px solid #252e3a;
+            transition: background 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .rank-row:hover {
+            background: #1a212b;
+        }
+
+        .rank-row:last-child {
+            border-bottom: none;
+        }
+
+        .rank-number {
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #ffd700;
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .rank-row.current-user {
+            background: rgba(255, 215, 0, 0.1);
+            border-left: 4px solid #ffd700;
+        }
+
+        .person-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .person-description {
+            color: #a0a8b5;
+            font-size: 0.75rem;
+            margin-top: 3px;
+        }
+
+        .assets a {
+            color: #ffd700;
+            text-decoration: none;
+            border-bottom: 1px dashed #ffd700;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .worth {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #ffd700;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .add-form {
+            background: #14181f;
+            border: 1px solid #2a323e;
+            border-radius: 40px;
+            padding: 30px;
+            margin: 40px 0;
+            box-shadow: 0 20px 30px -10px black;
+        }
+
+        .add-form h3 {
+            color: #ffd700;
+            font-size: 1.6rem;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            align-items: end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .input-group input {
+            background: #1e2530;
+            border: 1px solid #2f3742;
+            border-radius: 16px;
+            padding: 10px 14px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: #ffd700;
+            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+        }
+
+        .btn {
+            background: #ffd700;
+            border: none;
+            border-radius: 60px;
+            padding: 10px 25px;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #0a0c0f;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 10px 20px -8px rgba(255, 215, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 30px -8px #ffd700;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin: 40px 0;
+        }
+
+        .metric-card {
+            background: #14181f;
+            border: 1px solid #2a323e;
+            border-radius: 28px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #ffd700;
+            margin-bottom: 8px;
+        }
+
+        .metric-label {
+            color: #8b949e;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            color: #6a7280;
+            font-size: 0.85rem;
+            border-top: 1px solid #1e2530;
+            padding-top: 30px;
+        }
+
+        @media (max-width: 700px) {
+            .rank-header, .rank-row {
+                grid-template-columns: 45px 1.5fr 1.5fr 1fr;
+                font-size: 0.8rem;
+                padding: 10px 12px;
+            }
+            .worth { font-size: 0.95rem; }
+            .metrics { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Access denied screen (shown when not in Telegram) -->
+<div class="access-denied" id="accessDenied" style="display:none;">
+    <p id="accessDeniedText"></p>
+</div>
+
+<!-- Main app (hidden until Telegram is validated) -->
+<div class="container" id="mainApp" style="display:none;">
+    <div class="header">
+        <h1 id="titleText">FORBES <span id="titleTg">TG</span></h1>
+        <div class="subhead" id="subtitleText"></div>
+    </div>
+
+    <div class="lang-selector" id="langSelector">
+        <button data-lang="ru" class="active">🇷🇺 RU</button>
+        <button data-lang="en">🇬🇧 EN</button>
+        <button data-lang="zh">🇨🇳 中文</button>
+    </div>
+
+    <div class="promo">
+        <span class="promo-text" id="promoText"></span>
+        <span class="promo-stars" id="promoStars"></span>
+    </div>
+
+    <div class="stats">
+        <span id="statTotalLabel"></span>
+        <span id="statOnlineLabel"></span>
+    </div>
+
+    <div class="rank-table" id="rankTable">
+        <div class="rank-header">
+            <div id="headerRank">#</div>
+            <div id="headerName"></div>
+            <div id="headerChannels"></div>
+            <div id="headerStars"></div>
+        </div>
+        <div id="rankRows"></div>
+    </div>
+
+    <div class="metrics">
+        <div class="metric-card">
+            <div class="metric-value" id="participantsCount">0</div>
+            <div class="metric-label" id="participantsLabel"></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="needForTop1">0</div>
+            <div class="metric-label" id="needForTop1Label"></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value" id="needForTop100">0</div>
+            <div class="metric-label" id="needForTop100Label"></div>
+        </div>
+    </div>
+
+    <div class="add-form">
+        <h3 id="formTitle"></h3>
+        <div class="form-grid">
+            <div class="input-group">
+                <label id="labelName"></label>
+                <input type="text" id="nameInput" maxlength="100">
+            </div>
+            <div class="input-group">
+                <label id="labelDesc"></label>
+                <input type="text" id="descInput" maxlength="200">
+            </div>
+            <div class="input-group">
+                <label id="labelAssets"></label>
+                <input type="text" id="assetsInput" maxlength="500">
+            </div>
+            <div class="input-group">
+                <label id="labelAmount"></label>
+                <input type="number" id="amountInput" min="1" step="1" value="10">
+            </div>
+            <button class="btn" id="addBtn"></button>
+        </div>
+        <div id="errorMsg" style="color: #ffaa00; margin-top: 15px; text-align: center; display: none;"></div>
+    </div>
+
+    <footer id="footerText"></footer>
+</div>
+
+<script>
+    // --- Telegram WebApp init & validation ---
+    const tg = window.Telegram && window.Telegram.WebApp;
+    let tgInitData = '';
+    let currentUserId = '';
+
+    if (!tg || !tg.initData) {
+        // Not running inside Telegram — block access
+        document.getElementById('accessDenied').style.display = 'flex';
+        document.getElementById('accessDeniedText').textContent = 'This app is only available via Telegram.';
+        // Stop all further execution
+        throw new Error('Not in Telegram');
+    }
+
+    tg.ready();
+    tg.expand();
+    tgInitData = tg.initData;
+
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        currentUserId = tg.initDataUnsafe.user.id.toString();
+    }
+
+    // Show main app
+    document.getElementById('mainApp').style.display = 'block';
+
+    const API_URL = '';
+
+    // --- Language ---
+    let currentLang = localStorage.getItem('forbes_lang') || 'ru';
+    let T = {}; // translations
+
+    async function loadTranslations(lang) {
+        try {
+            const res = await fetch(API_URL + '/api/translations?lang=' + encodeURIComponent(lang));
+            T = await res.json();
+        } catch (e) {
+            T = {};
+        }
+    }
+
+    function applyTranslations() {
+        document.getElementById('subtitleText').textContent = T.f_subtitle || '';
+        document.getElementById('promoText').innerHTML = '<strong>' + escapeHtml(T.f_promo || '') + '</strong>';
+        document.getElementById('promoStars').textContent = T.f_promoSub || '';
+        document.getElementById('headerRank').textContent = T.f_headerRank || '#';
+        document.getElementById('headerName').textContent = T.f_headerName || '';
+        document.getElementById('headerChannels').textContent = T.f_headerChannels || '';
+        document.getElementById('headerStars').textContent = T.f_headerStars || '';
+        document.getElementById('participantsLabel').textContent = T.f_participants || '';
+        document.getElementById('needForTop1Label').textContent = T.f_needForTop1 || '';
+        document.getElementById('needForTop100Label').textContent = T.f_needForTop100 || '';
+        document.getElementById('formTitle').textContent = T.f_formTitle || '';
+        document.getElementById('labelName').textContent = T.f_labelName || '';
+        document.getElementById('labelDesc').textContent = T.f_labelDesc || '';
+        document.getElementById('labelAssets').textContent = T.f_labelAssets || '';
+        document.getElementById('labelAmount').textContent = T.f_labelAmount || '';
+        document.getElementById('addBtn').textContent = T.f_btnSubmit || '';
+        document.getElementById('nameInput').placeholder = T.f_placeholderName || '';
+        document.getElementById('descInput').placeholder = T.f_placeholderDesc || '';
+        document.getElementById('assetsInput').placeholder = T.f_placeholderAssets || '';
+        document.getElementById('footerText').textContent = T.f_footer || '';
+
+        // Update lang buttons
+        document.querySelectorAll('.lang-selector button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.lang === currentLang);
+        });
+    }
+
+    // Language buttons
+    document.querySelectorAll('.lang-selector button').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            currentLang = btn.dataset.lang;
+            localStorage.setItem('forbes_lang', currentLang);
+            await loadTranslations(currentLang);
+            applyTranslations();
+        });
+    });
+
+    // --- XSS protection ---
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    // Safe URL linkifier — only allows https:// t.me links
+    function linkify(text) {
+        if (!text) return '&mdash;';
+        const escaped = escapeHtml(text);
+        return escaped.replace(/(https:\/\/t\.me\/[a-zA-Z0-9_/]+)/g,
+            '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+        );
+    }
+
+    function formatStars(amount) {
+        return amount.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ★';
+    }
+
+    // --- Heartbeat ---
+    function sendHeartbeat() {
+        fetch(API_URL + '/api/heartbeat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: currentUserId, chatId: currentUserId })
+        }).catch(() => {});
+    }
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 120000);
+
+    // --- Load rating ---
+    async function loadRating() {
+        try {
+            const res = await fetch(API_URL + '/api/rating');
+            const data = await res.json();
+            const tbody = document.getElementById('rankRows');
+
+            // All data is already server-sanitized, but we escape again on client
+            tbody.innerHTML = data.map((item, i) => {
+                const assetsHtml = linkify(item.assets || '');
+                const isCurrent = (item.identifier === currentUserId);
+                const rankDisplay = (i === 0) ? '&#x1F451;' : (i + 1);
+                const rowClass = 'rank-row' + (isCurrent ? ' current-user' : '');
+                return '<div class="' + rowClass + '">'
+                    + '<div class="rank-number">' + rankDisplay + '</div>'
+                    + '<div>'
+                    + '<div class="person-name">' + escapeHtml(item.name) + '</div>'
+                    + (item.description ? '<div class="person-description">' + escapeHtml(item.description) + '</div>' : '')
+                    + '</div>'
+                    + '<div class="assets">' + assetsHtml + '</div>'
+                    + '<div class="worth">' + formatStars(item.amount) + '</div>'
+                    + '</div>';
+            }).join('');
+
+            document.getElementById('participantsCount').innerText = data.length;
+
+            if (data.length > 0) {
+                document.getElementById('needForTop1').innerText = (data[0].amount + 1).toFixed(0);
+            } else {
+                document.getElementById('needForTop1').innerText = '1';
+            }
+
+            // Top 100 threshold
+            if (data.length >= 100) {
+                document.getElementById('needForTop100').innerText = (data[99].amount + 1).toFixed(0);
+            } else {
+                document.getElementById('needForTop100').innerText = '1';
+            }
+        } catch (e) {
+            console.error('Error loading rating:', e);
+        }
+    }
+
+    // --- Load stats ---
+    async function loadStats() {
+        try {
+            const res = await fetch(API_URL + '/api/stats');
+            const stats = await res.json();
+            document.getElementById('statTotalLabel').innerHTML =
+                escapeHtml(T.f_totalUsers || 'Total') + ': <span>' + stats.totalUsers + '</span>';
+            document.getElementById('statOnlineLabel').innerHTML =
+                escapeHtml(T.f_online || 'Online') + ': <span>' + stats.online + '</span>';
+        } catch (e) {}
+    }
+
+    // --- Payment ---
+    async function initiatePayment() {
+        const errorDiv = document.getElementById('errorMsg');
+        errorDiv.style.display = 'none';
+
+        const name = document.getElementById('nameInput').value.trim();
+        const desc = document.getElementById('descInput').value.trim();
+        const assets = document.getElementById('assetsInput').value.trim();
+        const amountStars = parseInt(document.getElementById('amountInput').value);
+
+        if (!name || !desc) {
+            errorDiv.textContent = T.f_errorNameDesc || 'Fill in name and description';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        if (!amountStars || amountStars < 1) {
+            errorDiv.textContent = T.f_errorMinAmount || 'Minimum amount is 1 star';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        try {
+            const response = await fetch(API_URL + '/api/create-invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    description: desc,
+                    assets,
+                    amount: amountStars,
+                    identifier: currentUserId,
+                    chatId: currentUserId,
+                    initData: tgInitData
+                })
+            });
+            const data = await response.json();
+            if (data.invoiceLink) {
+                tg.openInvoice(data.invoiceLink, function(status) {
+                    if (status === 'paid') {
+                        setTimeout(loadRating, 2000);
+                    }
+                });
+            } else {
+                errorDiv.textContent = T.f_errorPayment || 'Payment error';
+                errorDiv.style.display = 'block';
+            }
+        } catch (e) {
+            errorDiv.textContent = T.f_errorServer || 'Server error';
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    document.getElementById('addBtn').onclick = initiatePayment;
+
+    // --- Init ---
+    (async () => {
+        await loadTranslations(currentLang);
+        applyTranslations();
+        loadRating();
+        loadStats();
+        setInterval(loadStats, 30000);
+        setInterval(loadRating, 60000);
+    })();
+</script>
+</body>
+</html>

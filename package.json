@@ -1,0 +1,21 @@
+{
+  "name": "forbes-ton",
+  "version": "1.0.0",
+  "description": "Forbes Telegram - Top 100 richest people rating",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "express": "^5.2.1",
+    "node-telegram-bot-api": "^0.67.0",
+    "sqlite3": "^5.1.7",
+    "sqlite": "^5.1.1"
+  }
+}
