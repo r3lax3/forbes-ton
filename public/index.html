@@ -563,7 +563,7 @@
             // All data is already server-sanitized, but we escape again on client
             tbody.innerHTML = data.map((item, i) => {
                 const assetsHtml = linkify(item.assets || '');
-                const isCurrent = (item.identifier === currentUserId);
+                const isCurrent = (item.chat_id === currentUserId);
                 const rankDisplay = (i === 0) ? '&#x1F451;' : (i + 1);
                 const rowClass = 'rank-row' + (isCurrent ? ' current-user' : '');
                 return '<div class="' + rowClass + '">'
@@ -638,8 +638,6 @@
                     description: desc,
                     assets,
                     amount: amountStars,
-                    identifier: currentUserId,
-                    chatId: currentUserId,
                     initData: tgInitData
                 })
             });

@@ -12,7 +12,6 @@ const APP_URL = process.env.APP_URL || 'https://forbes-ton.onrender.com';
 
 const pendingData = {};
 const lastSeen = new Map();
-const userChats = new Map(); // identifier -> chatId
 const broadcastState = new Map(); // chatId -> 'awaiting_broadcast'
 
 const app = express();
@@ -36,21 +35,29 @@ function validateTelegramInitData(initData) {
 
         if (computedHash !== hash) return null;
 
-        // Check auth_date is not too old (allow 24 hours)
         const authDate = parseInt(params.get('auth_date') || '0', 10);
         if (Date.now() / 1000 - authDate > 86400) return null;
 
         const userStr = params.get('user');
-        if (userStr) {
-            return JSON.parse(userStr);
-        }
+        if (userStr) return JSON.parse(userStr);
         return {};
     } catch (e) {
         return null;
     }
 }
 
-// --- Serve static files but protect index.html ---
+// --- HTML sanitization (prevent XSS) ---
+function sanitize(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
+
+// --- Serve static files ---
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
@@ -67,12 +74,9 @@ app.get('/api/translations', (req, res) => {
 
 // --- API: heartbeat ---
 app.post('/api/heartbeat', (req, res) => {
-    const { identifier, chatId } = req.body;
+    const { identifier } = req.body;
     if (identifier && typeof identifier === 'string') {
         lastSeen.set(identifier, Date.now());
-        if (chatId && typeof chatId === 'string') {
-            userChats.set(identifier, chatId);
-        }
     }
     res.sendStatus(200);
 });
@@ -81,7 +85,7 @@ app.post('/api/heartbeat', (req, res) => {
 app.get('/api/stats', async (req, res) => {
     const now = Date.now();
     const onlineTimeout = 5 * 60 * 1000;
-    const totalUsers = await db.getTotalBotUsers();
+    const totalUsers = await db.getTotalUsers();
     let online = 0;
     for (const last of lastSeen.values()) {
         if (now - last < onlineTimeout) online++;
@@ -92,9 +96,8 @@ app.get('/api/stats', async (req, res) => {
 // --- API: rating ---
 app.get('/api/rating', async (req, res) => {
     const rating = await db.getRating(100);
-    // Sanitize output — strip any HTML from user-submitted fields
     const safe = rating.map(r => ({
-        identifier: r.identifier,
+        chat_id: r.chat_id,
         name: sanitize(r.name),
         description: sanitize(r.description),
         assets: sanitize(r.assets),
@@ -105,22 +108,18 @@ app.get('/api/rating', async (req, res) => {
 
 // --- API: create invoice ---
 app.post('/api/create-invoice', async (req, res) => {
-    const { name, description, assets, amount, identifier, chatId, initData } = req.body;
+    const { name, description, assets, amount, initData } = req.body;
 
-    // Validate initData from Telegram
     const tgUser = validateTelegramInitData(initData);
     if (!tgUser) {
         return res.status(403).json({ error: 'Invalid Telegram authorization' });
     }
 
-    // Use Telegram user ID as the authoritative identifier
-    const safeIdentifier = tgUser.id ? tgUser.id.toString() : identifier;
-
-    if (!name || !description || !amount || !safeIdentifier) {
+    const chatId = tgUser.id ? tgUser.id.toString() : null;
+    if (!chatId || !name || !description || !amount) {
         return res.status(400).json({ error: 'Missing data' });
     }
 
-    // Validate & sanitize inputs
     const safeName = sanitize(String(name)).slice(0, 100);
     const safeDesc = sanitize(String(description)).slice(0, 200);
     const safeAssets = sanitize(String(assets || '')).slice(0, 500);
@@ -130,16 +129,13 @@ app.post('/api/create-invoice', async (req, res) => {
         return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    pendingData[safeIdentifier] = { name: safeName, description: safeDesc, assets: safeAssets };
-    if (chatId) {
-        userChats.set(safeIdentifier, String(chatId));
-    }
+    pendingData[chatId] = { name: safeName, description: safeDesc, assets: safeAssets };
 
     try {
         const response = await axios.post(`${TELEGRAM_API}/createInvoiceLink`, {
             title: 'Forbes TG — Top Spot',
-            description: `Participant: ${safeName} — ${safeDesc}`,
-            payload: JSON.stringify({ identifier: safeIdentifier }),
+            description: `${safeName} — ${safeDesc}`,
+            payload: JSON.stringify({ chatId }),
             currency: 'XTR',
             prices: [{ label: 'Participation', amount: starsAmount }],
             start_parameter: 'forbes'
@@ -156,23 +152,9 @@ app.post('/api/create-invoice', async (req, res) => {
     }
 });
 
-// --- HTML sanitization (prevent XSS) ---
-function sanitize(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;');
-}
-
 // --- Notify user about position drop ---
-async function notifyPositionDrop(identifier, oldPos, newPos) {
-    const chatId = userChats.get(identifier);
-    if (!chatId) return;
-
-    const lang = await db.getBotUserLang(chatId);
+async function notifyPositionDrop(chatId, oldPos, newPos) {
+    const lang = await db.getUserLang(chatId);
     const message = t(lang, 'positionDrop', { old: oldPos, new: newPos });
 
     try {
@@ -182,7 +164,7 @@ async function notifyPositionDrop(identifier, oldPos, newPos) {
             parse_mode: 'Markdown'
         });
     } catch (e) {
-        console.error(`[NOTIFY] Error sending to ${identifier}:`, e.message);
+        console.error(`[NOTIFY] Error sending to ${chatId}:`, e.message);
     }
 }
 
@@ -192,7 +174,7 @@ function isAdmin(chatId) {
 }
 
 async function sendAdminPanel(chatId) {
-    const lang = await db.getBotUserLang(String(chatId));
+    const lang = await db.getUserLang(String(chatId));
     const keyboard = {
         inline_keyboard: [
             [{ text: t(lang, 'btnStats'), callback_data: 'admin_stats' }],
@@ -208,7 +190,7 @@ async function sendAdminPanel(chatId) {
 }
 
 async function sendAdminStats(chatId) {
-    const lang = await db.getBotUserLang(String(chatId));
+    const lang = await db.getUserLang(String(chatId));
     const stats = await db.getAdminStats();
     const text = t(lang, 'adminStats', {
         total: stats.total,
@@ -224,7 +206,7 @@ async function sendAdminStats(chatId) {
 }
 
 async function performBroadcast(chatId, text) {
-    const allUsers = await db.getAllBotUserChatIds();
+    const allUsers = await db.getAllUsers();
     let sent = 0;
     let failed = 0;
 
@@ -239,13 +221,12 @@ async function performBroadcast(chatId, text) {
         } catch (e) {
             failed++;
         }
-        // Rate limit: 30 messages per second max
         if ((sent + failed) % 25 === 0) {
             await new Promise(r => setTimeout(r, 1000));
         }
     }
 
-    const lang = await db.getBotUserLang(String(chatId));
+    const lang = await db.getUserLang(String(chatId));
     await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: chatId,
         text: t(lang, 'broadcastDone', { sent, failed })
@@ -257,28 +238,25 @@ app.post('/webhook', async (req, res) => {
     const update = req.body;
 
     try {
-        // Handle callback queries (admin panel buttons, language selection)
+        // Callback queries (language selection, admin panel)
         if (update.callback_query) {
             const cb = update.callback_query;
             const chatId = cb.message.chat.id;
             const data = cb.data;
 
-            // Answer callback to remove loading indicator
             await axios.post(`${TELEGRAM_API}/answerCallbackQuery`, {
                 callback_query_id: cb.id
             }).catch(() => {});
 
-            // Language selection
             if (data.startsWith('lang_')) {
                 const lang = data.replace('lang_', '');
-                await db.setBotUserLang(String(chatId), lang);
+                await db.setUserLang(String(chatId), lang);
 
                 await axios.post(`${TELEGRAM_API}/sendMessage`, {
                     chat_id: chatId,
                     text: t(lang, 'langSet')
                 });
 
-                // Send welcome with app button
                 const keyboard = {
                     inline_keyboard: [
                         [{ text: t(lang, 'openApp'), web_app: { url: APP_URL } }]
@@ -292,13 +270,12 @@ app.post('/webhook', async (req, res) => {
                 });
             }
 
-            // Admin actions
             if (isAdmin(chatId)) {
                 if (data === 'admin_stats') {
                     await sendAdminStats(chatId);
                 } else if (data === 'admin_broadcast') {
                     broadcastState.set(String(chatId), 'awaiting_broadcast');
-                    const lang = await db.getBotUserLang(String(chatId));
+                    const lang = await db.getUserLang(String(chatId));
                     await axios.post(`${TELEGRAM_API}/sendMessage`, {
                         chat_id: chatId,
                         text: t(lang, 'broadcastPrompt')
@@ -307,16 +284,15 @@ app.post('/webhook', async (req, res) => {
             }
         }
 
-        // Handle messages
+        // Messages
         if (update.message) {
             const chatId = update.message.chat.id;
             const text = update.message.text || '';
 
-            // Register bot user
-            await db.upsertBotUser(String(chatId), 'ru');
+            // Register user on any message
+            await db.upsertUser(String(chatId), 'ru');
 
             if (text === '/start') {
-                // Send language selection
                 const langKeyboard = {
                     inline_keyboard: [
                         [
@@ -328,21 +304,20 @@ app.post('/webhook', async (req, res) => {
                 };
                 await axios.post(`${TELEGRAM_API}/sendMessage`, {
                     chat_id: chatId,
-                    text: t('ru', 'chooseLang'),
+                    text: '🌐 Choose your language / Выберите язык / 选择语言:',
                     reply_markup: langKeyboard
                 });
             } else if (text === '/admin' && isAdmin(chatId)) {
                 await sendAdminPanel(chatId);
             } else if (text === '/cancel' && broadcastState.get(String(chatId)) === 'awaiting_broadcast') {
                 broadcastState.delete(String(chatId));
-                const lang = await db.getBotUserLang(String(chatId));
+                const lang = await db.getUserLang(String(chatId));
                 await axios.post(`${TELEGRAM_API}/sendMessage`, {
                     chat_id: chatId,
                     text: t(lang, 'broadcastCancelled')
                 });
             } else if (broadcastState.get(String(chatId)) === 'awaiting_broadcast' && isAdmin(chatId)) {
                 broadcastState.delete(String(chatId));
-                // Run broadcast in background
                 performBroadcast(chatId, text).catch(e => console.error('[BROADCAST] Error:', e));
             }
         }
@@ -359,46 +334,42 @@ app.post('/webhook', async (req, res) => {
         if (update.message && update.message.successful_payment) {
             const payment = update.message.successful_payment;
             const payload = JSON.parse(payment.invoice_payload);
-            const { identifier } = payload;
+            const chatId = payload.chatId;
             const amountStars = payment.total_amount;
-            const payerChatId = update.message.chat.id;
 
-            const userData = pendingData[identifier];
+            const userData = pendingData[chatId];
             if (!userData) {
-                console.error(`[WEBHOOK] No pending data for identifier ${identifier}`);
+                console.error(`[WEBHOOK] No pending data for chatId ${chatId}`);
                 return res.sendStatus(200);
             }
 
             const { name, description, assets } = userData;
 
-            // Track stars in bot_users
-            await db.updateBotUserStars(String(payerChatId), amountStars);
-
-            // Save old positions
+            // Get old positions before update
             const oldRating = await db.getRating(100);
             const oldPositions = {};
-            oldRating.forEach((u, index) => { oldPositions[u.identifier] = index + 1; });
+            oldRating.forEach((u, index) => { oldPositions[u.chat_id] = index + 1; });
 
-            // Update rating
-            await db.addOrUpdateUser(identifier, name, description, assets, amountStars);
+            // Add stars to this user
+            await db.addStars(chatId, name, description, assets, amountStars);
 
-            // Check new positions and notify drops
+            // Get new positions after update
             const newRating = await db.getRating(100);
             const newPositions = {};
-            newRating.forEach((u, index) => { newPositions[u.identifier] = index + 1; });
+            newRating.forEach((u, index) => { newPositions[u.chat_id] = index + 1; });
 
-            for (const [id] of userChats.entries()) {
-                const oldPos = oldPositions[id];
+            // Notify users who dropped
+            for (const [id, oldPos] of Object.entries(oldPositions)) {
                 const newPos = newPositions[id];
-                if (oldPos && newPos && newPos > oldPos) {
+                if (newPos && newPos > oldPos) {
                     notifyPositionDrop(id, oldPos, newPos).catch(e =>
                         console.error(`[NOTIFY] Error for ${id}:`, e.message)
                     );
                 }
             }
 
-            console.log(`[WEBHOOK] Payment: ${amountStars} stars from ${name} (${identifier})`);
-            delete pendingData[identifier];
+            console.log(`[WEBHOOK] Payment: ${amountStars} stars from ${name} (${chatId})`);
+            delete pendingData[chatId];
         }
     } catch (err) {
         console.error('[WEBHOOK] Error:', err.message);
