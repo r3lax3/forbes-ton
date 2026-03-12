@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
+const { PENDING_MAX_AGE } = require('./config');
 
 async function openDb() {
     return open({
@@ -22,6 +23,18 @@ async function initDb() {
             created_at INTEGER NOT NULL DEFAULT 0
         )
     `);
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS pending_invoices (
+            chat_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            assets TEXT DEFAULT '',
+            created_at INTEGER NOT NULL
+        )
+    `);
+    // Clean up stale pending invoices (older than 24h)
+    const cutoff = Date.now() - PENDING_MAX_AGE;
+    await db.run('DELETE FROM pending_invoices WHERE created_at < ?', cutoff);
     await db.close();
 }
 
@@ -86,6 +99,34 @@ async function addStars(chatId, name, description, assets, amountToAdd) {
     await db.close();
 }
 
+// --- Pending invoices ---
+
+async function savePending(chatId, name, description, assets) {
+    const db = await openDb();
+    await db.run(
+        `INSERT INTO pending_invoices (chat_id, name, description, assets, created_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(chat_id) DO UPDATE SET
+             name = ?, description = ?, assets = ?, created_at = ?`,
+        [chatId, name, description || '', assets || '', Date.now(),
+         name, description || '', assets || '', Date.now()]
+    );
+    await db.close();
+}
+
+async function getPending(chatId) {
+    const db = await openDb();
+    const row = await db.get('SELECT * FROM pending_invoices WHERE chat_id = ?', chatId);
+    await db.close();
+    return row || null;
+}
+
+async function deletePending(chatId) {
+    const db = await openDb();
+    await db.run('DELETE FROM pending_invoices WHERE chat_id = ?', chatId);
+    await db.close();
+}
+
 // --- Stats ---
 
 async function getTotalUsers() {
@@ -125,6 +166,9 @@ module.exports = {
     getUserLang,
     getRating,
     addStars,
+    savePending,
+    getPending,
+    deletePending,
     getTotalUsers,
     getAdminStats,
     getAllUsers
