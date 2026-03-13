@@ -9,11 +9,11 @@ async function handleStart(chatId) {
             [
                 { text: '🇷🇺 Русский', callback_data: 'lang_ru' },
                 { text: '🇬🇧 English', callback_data: 'lang_en' },
-                { text: '🇨🇳 Chinese', callback_data: 'lang_zh' }
+                { text: '🇨🇳 中文', callback_data: 'lang_zh' }
             ]
         ]
     };
-    await sendMessage(chatId, '🌐 Choose your language / Выберите язык / Choose language:', {
+    await sendMessage(chatId, '🌐 Choose your language / Выберите язык / 选择语言:', {
         reply_markup: langKeyboard
     });
 }
