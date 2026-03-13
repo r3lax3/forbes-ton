@@ -23,6 +23,7 @@ if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
 document.getElementById('mainApp').style.display = 'block';
 
 const API_URL = '';
+let currentUserInRating = null; // null if not in rating, or the user's data object
 
 // --- Language ---
 let currentLang = localStorage.getItem('forbes_lang') || 'ru';
@@ -37,6 +38,18 @@ async function loadTranslations(lang) {
     }
 }
 
+function updateFormState() {
+    if (currentUserInRating) {
+        document.getElementById('formTitle').textContent = T.f_formTitleExisting || T.f_formTitle || '';
+        document.getElementById('labelAmount').textContent = T.f_labelAmountExisting || T.f_labelAmount || '';
+        document.getElementById('addBtn').textContent = T.f_btnSubmitExisting || T.f_btnSubmit || '';
+    } else {
+        document.getElementById('formTitle').textContent = T.f_formTitle || '';
+        document.getElementById('labelAmount').textContent = T.f_labelAmount || '';
+        document.getElementById('addBtn').textContent = T.f_btnSubmit || '';
+    }
+}
+
 function applyTranslations() {
     document.getElementById('subtitleText').textContent = T.f_subtitle || '';
     document.getElementById('promoText').innerHTML = '<strong>' + escapeHtml(T.f_promo || '') + '</strong>';
@@ -48,16 +61,16 @@ function applyTranslations() {
     document.getElementById('participantsLabel').textContent = T.f_participants || '';
     document.getElementById('needForTop1Label').textContent = T.f_needForTop1 || '';
     document.getElementById('needForTop100Label').textContent = T.f_needForTop100 || '';
-    document.getElementById('formTitle').textContent = T.f_formTitle || '';
     document.getElementById('labelName').textContent = T.f_labelName || '';
     document.getElementById('labelDesc').textContent = T.f_labelDesc || '';
     document.getElementById('labelAssets').textContent = T.f_labelAssets || '';
-    document.getElementById('labelAmount').textContent = T.f_labelAmount || '';
-    document.getElementById('addBtn').textContent = T.f_btnSubmit || '';
     document.getElementById('nameInput').placeholder = T.f_placeholderName || '';
     document.getElementById('descInput').placeholder = T.f_placeholderDesc || '';
     document.getElementById('assetsInput').placeholder = T.f_placeholderAssets || '';
     document.getElementById('footerText').textContent = T.f_footer || '';
+
+    // Update form title/button/amount label based on user's rating status
+    updateFormState();
 
     // Update lang buttons
     document.querySelectorAll('.lang-selector button').forEach(btn => {
@@ -141,6 +154,22 @@ async function loadRating() {
                 + '<div class="worth">' + formatStars(item.amount) + '</div>'
                 + '</div>';
         }).join('');
+
+        // Check if current user is in the rating
+        const prevInRating = currentUserInRating;
+        currentUserInRating = data.find(item => item.chat_id === currentUserId) || null;
+
+        // Update form state if user's presence in rating changed
+        if ((!prevInRating && currentUserInRating) || (prevInRating && !currentUserInRating)) {
+            updateFormState();
+        }
+
+        // Prefill form with user's existing data on first load
+        if (currentUserInRating && !prevInRating) {
+            document.getElementById('nameInput').value = currentUserInRating.name || '';
+            document.getElementById('descInput').value = currentUserInRating.description || '';
+            document.getElementById('assetsInput').value = currentUserInRating.assets || '';
+        }
 
         document.getElementById('participantsCount').innerText = data.length;
 
