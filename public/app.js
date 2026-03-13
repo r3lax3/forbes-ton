@@ -72,6 +72,7 @@ document.querySelectorAll('.lang-selector button').forEach(btn => {
         localStorage.setItem('forbes_lang', currentLang);
         await loadTranslations(currentLang);
         applyTranslations();
+        sendHeartbeat(currentLang);
     });
 });
 
@@ -97,14 +98,24 @@ function formatStars(amount) {
 }
 
 // --- Heartbeat ---
-function sendHeartbeat() {
-    fetch(API_URL + '/api/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: currentUserId, chatId: currentUserId })
-    }).catch(() => {});
+async function sendHeartbeat(lang) {
+    try {
+        const payload = { identifier: currentUserId, chatId: currentUserId };
+        if (lang) payload.lang = lang;
+        const res = await fetch(API_URL + '/api/heartbeat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.lang && data.lang !== currentLang) {
+            currentLang = data.lang;
+            localStorage.setItem('forbes_lang', currentLang);
+            await loadTranslations(currentLang);
+            applyTranslations();
+        }
+    } catch (e) {}
 }
-sendHeartbeat();
 setInterval(sendHeartbeat, 120000);
 
 // --- Load rating ---
@@ -216,6 +227,7 @@ document.getElementById('addBtn').onclick = initiatePayment;
 
 // --- Init ---
 (async () => {
+    await sendHeartbeat(); // fetch lang from DB (may update currentLang)
     await loadTranslations(currentLang);
     applyTranslations();
     loadRating();

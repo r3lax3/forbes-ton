@@ -17,12 +17,22 @@ router.get('/translations', (req, res) => {
 });
 
 // --- Heartbeat ---
-router.post('/heartbeat', (req, res) => {
-    const { identifier } = req.body;
-    if (identifier && typeof identifier === 'string') {
-        lastSeen.set(identifier, Date.now());
+router.post('/heartbeat', async (req, res) => {
+    const { identifier, lang } = req.body;
+    if (!identifier || typeof identifier !== 'string') {
+        return res.sendStatus(200);
     }
-    res.sendStatus(200);
+    lastSeen.set(identifier, Date.now());
+
+    // If lang sent from mini app — save to DB
+    if (lang && ALLOWED_LANGS.includes(lang)) {
+        await db.setUserLang(identifier, lang);
+        return res.json({ lang });
+    }
+
+    // Otherwise — return lang from DB
+    const dbLang = await db.getUserLang(identifier);
+    res.json({ lang: dbLang });
 });
 
 // --- Stats ---
