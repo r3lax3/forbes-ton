@@ -32,6 +32,12 @@ async function initDb() {
             created_at INTEGER NOT NULL
         )
     `);
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS rank_snapshots (
+            chat_id TEXT PRIMARY KEY,
+            position INTEGER NOT NULL
+        )
+    `);
     // Clean up stale pending invoices (older than 24h)
     const cutoff = Date.now() - PENDING_MAX_AGE;
     await db.run('DELETE FROM pending_invoices WHERE created_at < ?', cutoff);
@@ -127,6 +133,29 @@ async function deletePending(chatId) {
     await db.close();
 }
 
+// --- Rank snapshots ---
+
+async function getRankSnapshot() {
+    const db = await openDb();
+    const rows = await db.all('SELECT chat_id, position FROM rank_snapshots');
+    await db.close();
+    const snapshot = {};
+    rows.forEach(r => { snapshot[r.chat_id] = r.position; });
+    return snapshot;
+}
+
+async function saveRankSnapshot(positions) {
+    const db = await openDb();
+    await db.run('DELETE FROM rank_snapshots');
+    for (const [chatId, position] of Object.entries(positions)) {
+        await db.run(
+            'INSERT INTO rank_snapshots (chat_id, position) VALUES (?, ?)',
+            [chatId, position]
+        );
+    }
+    await db.close();
+}
+
 // --- Stats ---
 
 async function getTotalUsers() {
@@ -169,6 +198,8 @@ module.exports = {
     savePending,
     getPending,
     deletePending,
+    getRankSnapshot,
+    saveRankSnapshot,
     getTotalUsers,
     getAdminStats,
     getAllUsers

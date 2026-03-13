@@ -106,6 +106,9 @@ async function webhookHandler(req, res) {
                 }
             }
 
+            // Save rank snapshot for startup check
+            await db.saveRankSnapshot(newPositions);
+
             console.log(`[WEBHOOK] Payment: ${amountStars} stars from ${name} (${chatId})`);
             await db.deletePending(chatId);
         }
